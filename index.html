@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Controle Financeiro Mensal</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .animate-toast { animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased overflow-x-hidden relative">
+
+  <!-- Container de Notificações Toast -->
+  <div id="toastContainer" class="fixed top-3 right-3 left-3 sm:left-auto z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
+
+  <!-- HEADER -->
+  <header class="bg-slate-800/90 backdrop-blur border-b border-slate-700/60 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="p-1.5 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+          <i data-lucide="wallet" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base sm:text-lg leading-tight">FinançasMensais</h1>
+          <p class="text-[10px] sm:text-xs text-slate-400 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            Sincronizado na Nuvem
+          </p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+    <!-- BARRA DE SELEÇÃO DE MÊS E BOTÃO DE FECHAR MÊS -->
+    <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3 sm:p-4 backdrop-blur flex flex-col md:flex-row items-center justify-between gap-3 shadow-xl">
+      <div class="flex items-center justify-between w-full md:w-auto gap-2">
+        <button id="btnPrevMonth" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-600/50 transition-colors">
+          <i data-lucide="chevron-left" class="w-5 h-5"></i>
+        </button>
+        
+        <div class="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-slate-700">
+          <i data-lucide="calendar" class="w-4 h-4 text-indigo-400 flex-shrink-0"></i>
+          <select id="selectMonthYear" class="bg-transparent font-bold text-sm sm:text-base text-slate-100 focus:outline-none cursor-pointer">
+            <!-- Preenchido via JS -->
+          </select>
+        </div>
+
+        <button id="btnNextMonth" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-600/50 transition-colors">
+          <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- BOTÃO DE FECHAR MÊS -->
+      <button id="btnCloseMonth" class="w-full md:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-900/25">
+        <i data-lucide="check-check" class="w-4 h-4"></i>
+        <span>Fechar Mês e Copiar Recorrentes</span>
+      </button>
+    </div>
+
+    <!-- SALDO INICIAL E BOTÕES DE CADASTRO -->
+    <div class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hidden sm:block">
+          <i data-lucide="piggy-bank" class="w-6 h-6"></i>
+        </div>
+        <div class="w-full sm:w-auto">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Saldo Inicial do Mês</span>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-slate-400 text-sm font-bold">R$</span>
+            <input type="number" id="initialBalanceInput" step="0.01" class="flex-1 sm:flex-initial bg-slate-900/80 border border-slate-700 rounded-lg px-3 py-1.5 text-base font-bold text-emerald-400 focus:outline-none focus:border-indigo-500 w-full sm:w-36" placeholder="0,00">
+            <button id="btnSaveBalance" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-colors">
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 w-full md:w-auto">
+        <button id="btnOpenIncomeModal" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-lg shadow-emerald-900/20">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Nova Renda</span>
+        </button>
+        <button id="btnOpenExpenseModal" class="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-lg shadow-indigo-900/20">
+          <i data-lucide="minus-circle" class="w-4 h-4"></i>
+          <span>Nova Despesa</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- CARDS DE MÉTRICAS -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 mb-1 sm:mb-2">
+          <span class="text-[10px] sm:text-xs font-medium uppercase tracking-wider">Entrada (Real)</span>
+          <div class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+            <i data-lucide="arrow-down-left" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </div>
+        </div>
+        <div>
+          <div id="statIncomeReceived" class="text-base sm:text-2xl font-extrabold text-emerald-400 truncate">R$ 0,00</div>
+          <p id="statIncomePending" class="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">Previsto: R$ 0,00</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 mb-1 sm:mb-2">
+          <span class="text-[10px] sm:text-xs font-medium uppercase tracking-wider">Despesas Pagas</span>
+          <div class="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </div>
+        </div>
+        <div>
+          <div id="statExpensePaid" class="text-base sm:text-2xl font-extrabold text-rose-400 truncate">R$ 0,00</div>
+          <p id="statExpensePending" class="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">Pendente: R$ 0,00</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 mb-1 sm:mb-2">
+          <span class="text-[10px] sm:text-xs font-medium uppercase tracking-wider">Saldo Hoje</span>
+          <div class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+            <i data-lucide="scale" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </div>
+        </div>
+        <div>
+          <div id="statBalanceRealized" class="text-base sm:text-2xl font-extrabold text-white truncate">R$ 0,00</div>
+          <p class="text-[10px] sm:text-xs text-slate-400 mt-0.5 hidden sm:block">Saldo Inicial + Entradas - Pagos</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 sm:p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 mb-1 sm:mb-2">
+          <span class="text-[10px] sm:text-xs font-medium uppercase tracking-wider">Projeção Final</span>
+          <div class="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg">
+            <i data-lucide="trending-up" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </div>
+        </div>
+        <div>
+          <div id="statBalanceProjected" class="text-base sm:text-2xl font-extrabold text-amber-400 truncate">R$ 0,00</div>
+          <p class="text-[10px] sm:text-xs text-slate-400 mt-0.5 hidden sm:block">Considera tudo a receber/pagar</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABAS E CONTEÚDO -->
+    <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden backdrop-blur">
+      <div class="border-b border-slate-700/60 px-3 sm:px-6 bg-slate-900/40 overflow-x-auto">
+        <div class="flex space-x-2 whitespace-nowrap min-w-max">
+          <button id="tabBtnExpenses" class="py-3 sm:py-4 px-2 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 border-indigo-500 text-indigo-400 flex items-center gap-1.5 transition-colors">
+            <i data-lucide="receipt" class="w-4 h-4"></i>
+            <span>Despesas & Contas</span>
+          </button>
+          <button id="tabBtnIncomes" class="py-3 sm:py-4 px-2 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors">
+            <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i>
+            <span>Rendas & Entradas</span>
+          </button>
+          <button id="tabBtnCharts" class="py-3 sm:py-4 px-2 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+            <span>Visão Geral</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 1: DESPESAS -->
+      <div id="tabContentExpenses" class="p-3 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="expenseSearch" placeholder="Buscar despesa..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2 sm:flex">
+            <select id="expenseFilterStatus" class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">Todos os Status</option>
+              <option value="PENDING">Pendentes</option>
+              <option value="PAID">Pagas</option>
+            </select>
+            <select id="expenseFilterCategory" class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">Todas Categorias</option>
+              <option value="Moradia">Moradia</option>
+              <option value="Contas Casa">Contas Casa</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Alimentação">Alimentação</option>
+              <option value="Transporte">Transporte</option>
+              <option value="Lazer">Lazer</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Educação">Educação</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- VISÃO TABLET/DESKTOP (TABELA) -->
+        <div class="hidden md:block overflow-x-auto rounded-xl border border-slate-700/50">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-900/60 text-slate-400 text-xs font-semibold uppercase border-b border-slate-700/50">
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Descrição</th>
+                <th class="py-3 px-4">Vencimento</th>
+                <th class="py-3 px-4">Categoria</th>
+                <th class="py-3 px-4">Recorrência</th>
+                <th class="py-3 px-4 text-right">Valor</th>
+                <th class="py-3 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="expenseTableBody" class="divide-y divide-slate-700/40 text-sm"></tbody>
+          </table>
+        </div>
+
+        <!-- VISÃO MOBILE (CARDS) -->
+        <div id="expenseCardsMobile" class="grid grid-cols-1 gap-2.5 md:hidden"></div>
+      </div>
+
+      <!-- TAB 2: RENDAS -->
+      <div id="tabContentIncomes" class="p-3 sm:p-6 space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="incomeSearch" placeholder="Buscar renda..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <select id="incomeFilterStatus" class="bg-slate-900/80 border border-slate-700/80 rounded-xl px-2.5 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="ALL">Todos os Status</option>
+            <option value="RECEIVED">Recebido</option>
+            <option value="PENDING">A Receber</option>
+          </select>
+        </div>
+
+        <!-- VISÃO TABLET/DESKTOP (TABELA) -->
+        <div class="hidden md:block overflow-x-auto rounded-xl border border-slate-700/50">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-900/60 text-slate-400 text-xs font-semibold uppercase border-b border-slate-700/50">
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Origem / Descrição</th>
+                <th class="py-3 px-4">Data Prevista/Recebida</th>
+                <th class="py-3 px-4 text-right">Valor Exato</th>
+                <th class="py-3 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="incomeTableBody" class="divide-y divide-slate-700/40 text-sm"></tbody>
+          </table>
+        </div>
+
+        <!-- VISÃO MOBILE (CARDS) -->
+        <div id="incomeCardsMobile" class="grid grid-cols-1 gap-2.5 md:hidden"></div>
+      </div>
+
+      <!-- TAB 3: GRÁFICOS -->
+      <div id="tabContentCharts" class="p-3 sm:p-6 space-y-6 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div class="bg-slate-900/40 p-3 sm:p-4 rounded-xl border border-slate-700/50 flex flex-col items-center">
+            <h3 class="text-xs sm:text-sm font-semibold text-slate-300 mb-3 self-start">Despesas por Categoria</h3>
+            <div class="w-full max-w-xs h-56 sm:h-64"><canvas id="categoryChart"></canvas></div>
+          </div>
+          <div class="bg-slate-900/40 p-3 sm:p-4 rounded-xl border border-slate-700/50 flex flex-col items-center">
+            <h3 class="text-xs sm:text-sm font-semibold text-slate-300 mb-3 self-start">Balanço Geral do Mês</h3>
+            <div class="w-full h-56 sm:h-64 flex items-center justify-center"><canvas id="summaryChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: DESPESA -->
+  <div id="expenseModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 id="expenseModalTitle" class="font-bold text-base sm:text-lg text-slate-100">Adicionar Despesa</h3>
+        <button id="btnCloseExpenseModal" class="text-slate-400 hover:text-slate-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="expenseForm" class="p-4 space-y-3.5 overflow-y-auto">
+        <input type="hidden" id="expenseId">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Nome da Despesa</label>
+          <input type="text" id="expenseName" required placeholder="Ex: Aluguel, Luz..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Valor (R$)</label>
+            <input type="number" id="expenseAmount" step="0.01" required placeholder="0,00" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Vencimento</label>
+            <input type="date" id="expenseDueDate" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Categoria</label>
+            <select id="expenseCategory" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+              <option value="Moradia">Moradia</option>
+              <option value="Contas Casa">Contas Casa</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Alimentação">Alimentação</option>
+              <option value="Transporte">Transporte</option>
+              <option value="Lazer">Lazer</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Educação">Educação</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Status</label>
+            <select id="expenseStatus" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+              <option value="PENDING">Pendente</option>
+              <option value="PAID">Pago</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bg-slate-800/60 border border-slate-700 p-3 rounded-xl flex items-center gap-3">
+          <input type="checkbox" id="expenseRecurring" class="w-4 h-4 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-900 cursor-pointer">
+          <label for="expenseRecurring" class="text-xs text-slate-300 cursor-pointer font-medium select-none">
+            Despesa Recorrente <span class="text-slate-400 block text-[11px] font-normal">Repete mensalmente</span>
+          </label>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+          <button type="button" id="btnCancelExpense" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm rounded-xl font-medium">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm rounded-xl font-medium">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RENDA -->
+  <div id="incomeModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 id="incomeModalTitle" class="font-bold text-base sm:text-lg text-slate-100">Adicionar Renda</h3>
+        <button id="btnCloseIncomeModal" class="text-slate-400 hover:text-slate-200"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="incomeForm" class="p-4 space-y-3.5 overflow-y-auto">
+        <input type="hidden" id="incomeId">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Origem / Descrição</label>
+          <input type="text" id="incomeName" required placeholder="Ex: Salário Dia 15..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Valor (R$)</label>
+            <input type="number" id="incomeAmount" step="0.01" required placeholder="0,00" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Data</label>
+            <input type="date" id="incomeDate" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Status</label>
+          <select id="incomeStatus" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="RECEIVED">Recebido</option>
+            <option value="PENDING">A Receber</option>
+          </select>
+        </div>
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+          <button type="button" id="btnCancelIncome" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm rounded-xl font-medium">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm rounded-xl font-medium">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMAÇÃO CUSTOMIZADO -->
+  <div id="confirmModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-5 text-center space-y-4">
+      <div class="w-10 h-10 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-base text-slate-100">Confirmar ação</h3>
+        <p id="confirmModalText" class="text-xs text-slate-400 mt-1">Tem certeza?</p>
+      </div>
+      <div class="flex items-center justify-center gap-2 pt-2">
+        <button id="btnCancelConfirm" class="flex-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl font-medium">Cancelar</button>
+        <button id="btnAcceptConfirm" class="flex-1 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs rounded-xl font-medium">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE SDK v9 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBu0S3Sp306Nj7R0xe5Idtet6ygbwdCah0",
+      authDomain: "controle-financeiro-37f94.firebaseapp.com",
+      projectId: "controle-financeiro-37f94",
+      storageBucket: "controle-financeiro-37f94.firebasestorage.app",
+      messagingSenderId: "924433383107",
+      appId: "1:924433383107:web:84119787b35bff0d8a6c76",
+      measurementId: "G-Y246CJL0LE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const docRef = doc(db, "finance", "main_data");
+
+    const defaultData = {
+      "2026-10": {
+        initialBalance: 500.00,
+        incomes: [
+          { id: 'inc-1', name: 'Primeira Parcela (Dia 15)', amount: 1850.00, date: '2026-10-15', status: 'RECEIVED' },
+          { id: 'inc-2', name: 'Segunda Parcela (Dia 30)', amount: 1920.00, date: '2026-10-30', status: 'PENDING' }
+        ],
+        expenses: [
+          { id: 'exp-1', name: 'Aluguel', amount: 1200.00, dueDate: '2026-10-10', category: 'Moradia', status: 'PAID', isRecurring: true },
+          { id: 'exp-2', name: 'Energia / Água', amount: 180.00, dueDate: '2026-10-20', category: 'Contas Casa', status: 'PENDING', isRecurring: true },
+          { id: 'exp-3', name: 'Fatura Cartão Itaú', amount: 450.00, dueDate: '2026-10-25', category: 'Cartão de Crédito', status: 'PENDING', isRecurring: false }
+        ]
+      }
+    };
+
+    window.appData = {};
+    window.currentMonthKey = getCurrentMonthKey();
+
+    function getCurrentMonthKey() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        window.appData = docSnap.data();
+      } else {
+        window.appData = defaultData;
+        saveDataToFirebase();
+      }
+      renderApp();
+    }, (error) => {
+      console.error("Erro ao sincronizar com Firebase:", error);
+      showToast("Erro de conexão com o banco!", "danger");
+    });
+
+    async function saveDataToFirebase() {
+      try {
+        await setDoc(docRef, window.appData);
+      } catch (e) {
+        console.error("Erro ao salvar no Firebase:", e);
+        showToast("Erro ao salvar alterações!", "danger");
+      }
+    }
+    window.saveDataToFirebase = saveDataToFirebase;
+
+    function getActiveMonthData() {
+      if (!window.appData[window.currentMonthKey]) {
+        window.appData[window.currentMonthKey] = { initialBalance: 0, incomes: [], expenses: [] };
+      }
+      return window.appData[window.currentMonthKey];
+    }
+    window.getActiveMonthData = getActiveMonthData;
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const icons = { success: 'check-circle', danger: 'trash-2', info: 'info' };
+      const colors = {
+        success: 'bg-slate-900/95 border-emerald-500/40 text-emerald-400',
+        danger: 'bg-slate-900/95 border-rose-500/40 text-rose-400',
+        info: 'bg-slate-900/95 border-indigo-500/40 text-indigo-400'
+      };
+
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border shadow-xl backdrop-blur animate-toast ${colors[type] || colors.success}`;
+      toast.innerHTML = `<i data-lucide="${icons[type] || 'check-circle'}" class="w-4 h-4 flex-shrink-0"></i><span class="text-xs font-medium text-slate-100">${message}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        toast.style.transition = 'all 0.2s ease-out';
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+    window.showToast = showToast;
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+    }
+
+    function formatDate(dateStr) {
+      if(!dateStr) return '';
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+    }
+
+    function customConfirm(message, acceptColor = 'rose') {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const textEl = document.getElementById('confirmModalText');
+        const btnAccept = document.getElementById('btnAcceptConfirm');
+        const btnCancel = document.getElementById('btnCancelConfirm');
+
+        textEl.textContent = message;
+        btnAccept.className = `flex-1 px-3 py-2 text-white text-xs rounded-xl font-medium ${acceptColor === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'}`;
+        modal.classList.remove('hidden');
+
+        const handleAccept = () => { cleanup(); resolve(true); };
+        const handleCancel = () => { cleanup(); resolve(false); };
+        const cleanup = () => {
+          modal.classList.add('hidden');
+          btnAccept.removeEventListener('click', handleAccept);
+          btnCancel.removeEventListener('click', handleCancel);
+        };
+
+        btnAccept.addEventListener('click', handleAccept);
+        btnCancel.addEventListener('click', handleCancel);
+      });
+    }
+
+    const selectMonthYear = document.getElementById('selectMonthYear');
+    const initialBalanceInput = document.getElementById('initialBalanceInput');
+    const btnSaveBalance = document.getElementById('btnSaveBalance');
+    const statIncomeReceived = document.getElementById('statIncomeReceived');
+    const statIncomePending = document.getElementById('statIncomePending');
+    const statExpensePaid = document.getElementById('statExpensePaid');
+    const statExpensePending = document.getElementById('statExpensePending');
+    const statBalanceRealized = document.getElementById('statBalanceRealized');
+    const statBalanceProjected = document.getElementById('statBalanceProjected');
+    const expenseTableBody = document.getElementById('expenseTableBody');
+    const expenseCardsMobile = document.getElementById('expenseCardsMobile');
+    const incomeTableBody = document.getElementById('incomeTableBody');
+    const incomeCardsMobile = document.getElementById('incomeCardsMobile');
+    const expenseSearch = document.getElementById('expenseSearch');
+    const expenseFilterStatus = document.getElementById('expenseFilterStatus');
+    const expenseFilterCategory = document.getElementById('expenseFilterCategory');
+    const incomeSearch = document.getElementById('incomeSearch');
+    const incomeFilterStatus = document.getElementById('incomeFilterStatus');
+
+    let categoryChartInstance = null;
+    let summaryChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupTabs();
+      setupMonthSelector();
+      setupEventListeners();
+    });
+
+    function setupMonthSelector() {
+      selectMonthYear.addEventListener('change', (e) => {
+        window.currentMonthKey = e.target.value;
+        renderApp();
+      });
+
+      document.getElementById('btnPrevMonth').addEventListener('click', () => navigateMonth(-1));
+      document.getElementById('btnNextMonth').addEventListener('click', () => navigateMonth(1));
+
+      document.getElementById('btnCloseMonth').addEventListener('click', async () => {
+        const currentData = getActiveMonthData();
+        const tRec = currentData.incomes.filter(i => i.status === 'RECEIVED').reduce((a,b)=>a+Number(b.amount),0) + currentData.initialBalance;
+        const tExp = currentData.expenses.filter(e => e.status === 'PAID').reduce((a,b)=>a+Number(b.amount),0);
+        const sobra = tRec - tExp;
+
+        const confirmed = await customConfirm(`Deseja fechar este mês? A sobra de ${formatCurrency(sobra)} será levada e as despesas RECORRENTES serão copiadas para o próximo mês.`, 'emerald');
+        if (confirmed) {
+          const [y, m] = window.currentMonthKey.split('-').map(Number);
+          let nextM = m + 1;
+          let nextY = y;
+          if (nextM > 12) { nextM = 1; nextY++; }
+          const nextKey = `${nextY}-${String(nextM).padStart(2, '0')}`;
+
+          if (!window.appData[nextKey]) {
+            window.appData[nextKey] = { initialBalance: sobra > 0 ? sobra : 0, incomes: [], expenses: [] };
+          } else {
+            window.appData[nextKey].initialBalance = sobra > 0 ? sobra : 0;
+          }
+
+          const recurringExpenses = currentData.expenses.filter(e => e.isRecurring);
+          
+          recurringExpenses.forEach(recExp => {
+            const exists = window.appData[nextKey].expenses.some(e => e.name.toLowerCase() === recExp.name.toLowerCase());
+            if (!exists) {
+              const day = recExp.dueDate.split('-')[2] || '10';
+              const nextDueDate = `${nextKey}-${day}`;
+              
+              window.appData[nextKey].expenses.push({
+                id: 'exp-' + Date.now() + Math.random().toString(36).substr(2, 4),
+                name: recExp.name,
+                amount: recExp.amount,
+                dueDate: nextDueDate,
+                category: recExp.category,
+                status: 'PENDING',
+                isRecurring: true
+              });
+            }
+          });
+
+          window.currentMonthKey = nextKey;
+          saveDataToFirebase();
+          showToast(`Mês fechado e sincronizado!`, "success");
+        }
+      });
+    }
+
+    function updateMonthDropdown() {
+      if (!window.appData[window.currentMonthKey]) {
+        window.appData[window.currentMonthKey] = { initialBalance: 0, incomes: [], expenses: [] };
+      }
+
+      const keys = Object.keys(window.appData).sort();
+      selectMonthYear.innerHTML = keys.map(k => {
+        const [year, month] = k.split('-');
+        const dateObj = new Date(year, month - 1, 1);
+        const label = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        const capitalized = label.charAt(0).toUpperCase() + label.slice(1);
+        return `<option value="${k}" ${k === window.currentMonthKey ? 'selected' : ''}>${capitalized}</option>`;
+      }).join('');
+    }
+
+    function navigateMonth(direction) {
+      const keys = Object.keys(window.appData).sort();
+      let index = keys.indexOf(window.currentMonthKey);
+      index += direction;
+      if (index >= 0 && index < keys.length) {
+        window.currentMonthKey = keys[index];
+        updateMonthDropdown();
+        renderApp();
+      }
+    }
+
+    function setupTabs() {
+      const tabBtnExpenses = document.getElementById('tabBtnExpenses');
+      const tabBtnIncomes = document.getElementById('tabBtnIncomes');
+      const tabBtnCharts = document.getElementById('tabBtnCharts');
+      const tabContentExpenses = document.getElementById('tabContentExpenses');
+      const tabContentIncomes = document.getElementById('tabContentIncomes');
+      const tabContentCharts = document.getElementById('tabContentCharts');
+
+      function resetTabs() {
+        [tabBtnExpenses, tabBtnIncomes, tabBtnCharts].forEach(btn => {
+          btn.classList.remove('border-indigo-500', 'text-indigo-400');
+          btn.classList.add('border-transparent', 'text-slate-400');
+        });
+        [tabContentExpenses, tabContentIncomes, tabContentCharts].forEach(c => c.classList.add('hidden'));
+      }
+
+      tabBtnExpenses.addEventListener('click', () => { resetTabs(); tabBtnExpenses.classList.add('border-indigo-500', 'text-indigo-400'); tabContentExpenses.classList.remove('hidden'); });
+      tabBtnIncomes.addEventListener('click', () => { resetTabs(); tabBtnIncomes.classList.add('border-indigo-500', 'text-indigo-400'); tabContentIncomes.classList.remove('hidden'); });
+      tabBtnCharts.addEventListener('click', () => { resetTabs(); tabBtnCharts.classList.add('border-indigo-500', 'text-indigo-400'); tabContentCharts.classList.remove('hidden'); renderCharts(); });
+    }
+
+    function renderApp() {
+      updateMonthDropdown();
+      const monthData = getActiveMonthData();
+      initialBalanceInput.value = monthData.initialBalance;
+
+      const totalIncomeReceived = monthData.incomes.filter(i => i.status === 'RECEIVED').reduce((acc, i) => acc + Number(i.amount), 0);
+      const totalIncomePending = monthData.incomes.filter(i => i.status === 'PENDING').reduce((acc, i) => acc + Number(i.amount), 0);
+      const totalExpensePaid = monthData.expenses.filter(e => e.status === 'PAID').reduce((acc, e) => acc + Number(e.amount), 0);
+      const totalExpensePending = monthData.expenses.filter(e => e.status === 'PENDING').reduce((acc, e) => acc + Number(e.amount), 0);
+
+      const balanceRealized = (monthData.initialBalance + totalIncomeReceived) - totalExpensePaid;
+      const balanceProjected = (monthData.initialBalance + totalIncomeReceived + totalIncomePending) - (totalExpensePaid + totalExpensePending);
+
+      statIncomeReceived.textContent = formatCurrency(totalIncomeReceived);
+      statIncomePending.textContent = `Previsto: ${formatCurrency(totalIncomePending)}`;
+      statExpensePaid.textContent = formatCurrency(totalExpensePaid);
+      statExpensePending.textContent = `Pendente: ${formatCurrency(totalExpensePending)}`;
+
+      statBalanceRealized.textContent = formatCurrency(balanceRealized);
+      statBalanceRealized.className = `text-base sm:text-2xl font-extrabold ${balanceRealized >= 0 ? 'text-white' : 'text-rose-400'}`;
+
+      statBalanceProjected.textContent = formatCurrency(balanceProjected);
+      statBalanceProjected.className = `text-base sm:text-2xl font-extrabold ${balanceProjected >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+      renderExpenseTable();
+      renderIncomeTable();
+      lucide.createIcons();
+    }
+
+    function renderExpenseTable() {
+      const monthData = getActiveMonthData();
+      const search = expenseSearch.value.toLowerCase();
+      const statusFilter = expenseFilterStatus.value;
+      const categoryFilter = expenseFilterCategory.value;
+
+      const filtered = monthData.expenses.filter(e => {
+        const matchesSearch = e.name.toLowerCase().includes(search);
+        const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
+        const matchesCategory = categoryFilter === 'ALL' || e.category === categoryFilter;
+        return matchesSearch && matchesStatus && matchesCategory;
+      });
+
+      if (filtered.length === 0) {
+        expenseTableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Nenhuma despesa neste mês.</td></tr>`;
+        expenseCardsMobile.innerHTML = `<div class="py-8 text-center text-slate-500 text-xs">Nenhuma despesa neste mês.</div>`;
+        return;
+      }
+
+      // RENDER DESKTOP (TABELA)
+      expenseTableBody.innerHTML = filtered.map(exp => {
+        const isPaid = exp.status === 'PAID';
+        const isOverdue = !isPaid && new Date(exp.dueDate + 'T23:59:59') < new Date();
+
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="py-3 px-4">
+              <button onclick="toggleExpenseStatus('${exp.id}')" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                isOverdue ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 
+                'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              }">
+                <i data-lucide="${isPaid ? 'check-circle' : isOverdue ? 'alert-circle' : 'clock'}" class="w-3.5 h-3.5"></i>
+                <span>${isPaid ? 'Pago' : isOverdue ? 'Vencida' : 'Pendente'}</span>
+              </button>
+            </td>
+            <td class="py-3 px-4 font-medium text-slate-200">${exp.name}</td>
+            <td class="py-3 px-4 text-slate-400">${formatDate(exp.dueDate)}</td>
+            <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs border border-slate-700">${exp.category}</span></td>
+            <td class="py-3 px-4">
+              ${exp.isRecurring ? 
+                '<span class="inline-flex items-center gap-1 text-xs text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20"><i data-lucide="repeat" class="w-3 h-3"></i> Recorrente</span>' : 
+                '<span class="text-xs text-slate-500">Eventual</span>'}
+            </td>
+            <td class="py-3 px-4 text-right font-bold text-slate-200">${formatCurrency(exp.amount)}</td>
+            <td class="py-3 px-4 text-center">
+              <div class="flex items-center justify-center gap-2">
+                <button onclick="editExpense('${exp.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deleteExpense('${exp.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // RENDER MOBILE (CARDS)
+      expenseCardsMobile.innerHTML = filtered.map(exp => {
+        const isPaid = exp.status === 'PAID';
+        const isOverdue = !isPaid && new Date(exp.dueDate + 'T23:59:59') < new Date();
+
+        return `
+          <div class="bg-slate-900/80 border border-slate-700/60 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1">
+                <h4 class="font-semibold text-sm text-slate-100">${exp.name}</h4>
+                <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-400">
+                  <span>${formatDate(exp.dueDate)}</span>
+                  <span>•</span>
+                  <span class="text-indigo-300">${exp.category}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="font-bold text-sm text-slate-100">${formatCurrency(exp.amount)}</div>
+                ${exp.isRecurring ? '<span class="text-[10px] text-indigo-400 font-medium">Recorrente</span>' : ''}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800">
+              <button onclick="toggleExpenseStatus('${exp.id}')" class="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                isOverdue ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 
+                'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              }">
+                <i data-lucide="${isPaid ? 'check-circle' : isOverdue ? 'alert-circle' : 'clock'}" class="w-3 h-3"></i>
+                <span>${isPaid ? 'Pago' : isOverdue ? 'Vencida' : 'Pendente'}</span>
+              </button>
+
+              <div class="flex items-center gap-3">
+                <button onclick="editExpense('${exp.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deleteExpense('${exp.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderIncomeTable() {
+      const monthData = getActiveMonthData();
+      const search = incomeSearch.value.toLowerCase();
+      const statusFilter = incomeFilterStatus.value;
+
+      const filtered = monthData.incomes.filter(i => {
+        const matchesSearch = i.name.toLowerCase().includes(search);
+        const matchesStatus = statusFilter === 'ALL' || i.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
+
+      if (filtered.length === 0) {
+        incomeTableBody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">Nenhuma renda neste mês.</td></tr>`;
+        incomeCardsMobile.innerHTML = `<div class="py-8 text-center text-slate-500 text-xs">Nenhuma renda neste mês.</div>`;
+        return;
+      }
+
+      // RENDER DESKTOP (TABELA)
+      incomeTableBody.innerHTML = filtered.map(inc => {
+        const isReceived = inc.status === 'RECEIVED';
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="py-3 px-4">
+              <button onclick="toggleIncomeStatus('${inc.id}')" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                isReceived ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              }">
+                <i data-lucide="${isReceived ? 'check-circle' : 'clock'}" class="w-3.5 h-3.5"></i>
+                <span>${isReceived ? 'Recebido' : 'A Receber'}</span>
+              </button>
+            </td>
+            <td class="py-3 px-4 font-medium text-slate-200">${inc.name}</td>
+            <td class="py-3 px-4 text-slate-400">${formatDate(inc.date)}</td>
+            <td class="py-3 px-4 text-right font-bold text-emerald-400">${formatCurrency(inc.amount)}</td>
+            <td class="py-3 px-4 text-center">
+              <div class="flex items-center justify-center gap-2">
+                <button onclick="editIncome('${inc.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deleteIncome('${inc.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // RENDER MOBILE (CARDS)
+      incomeCardsMobile.innerHTML = filtered.map(inc => {
+        const isReceived = inc.status === 'RECEIVED';
+        return `
+          <div class="bg-slate-900/80 border border-slate-700/60 rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="font-semibold text-sm text-slate-100">${inc.name}</h4>
+                <p class="text-[11px] text-slate-400 mt-0.5">${formatDate(inc.date)}</p>
+              </div>
+              <div class="font-bold text-sm text-emerald-400">${formatCurrency(inc.amount)}</div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800">
+              <button onclick="toggleIncomeStatus('${inc.id}')" class="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                isReceived ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              }">
+                <i data-lucide="${isReceived ? 'check-circle' : 'clock'}" class="w-3 h-3"></i>
+                <span>${isReceived ? 'Recebido' : 'A Receber'}</span>
+              </button>
+
+              <div class="flex items-center gap-3">
+                <button onclick="editIncome('${inc.id}')" class="text-slate-400 hover:text-indigo-400 p-1"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deleteIncome('${inc.id}')" class="text-slate-400 hover:text-rose-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setupEventListeners() {
+      btnSaveBalance.addEventListener('click', () => {
+        const monthData = getActiveMonthData();
+        monthData.initialBalance = parseFloat(initialBalanceInput.value) || 0;
+        saveDataToFirebase();
+        showToast("Saldo inicial salvo!", "success");
+      });
+
+      expenseSearch.addEventListener('input', renderExpenseTable);
+      expenseFilterStatus.addEventListener('change', renderExpenseTable);
+      expenseFilterCategory.addEventListener('change', renderExpenseTable);
+      incomeSearch.addEventListener('input', renderIncomeTable);
+      incomeFilterStatus.addEventListener('change', renderIncomeTable);
+
+      const expenseModal = document.getElementById('expenseModal');
+      const incomeModal = document.getElementById('incomeModal');
+
+      document.getElementById('btnOpenExpenseModal').addEventListener('click', () => openExpenseModal());
+      document.getElementById('btnCloseExpenseModal').addEventListener('click', () => expenseModal.classList.add('hidden'));
+      document.getElementById('btnCancelExpense').addEventListener('click', () => expenseModal.classList.add('hidden'));
+
+      document.getElementById('btnOpenIncomeModal').addEventListener('click', () => openIncomeModal());
+      document.getElementById('btnCloseIncomeModal').addEventListener('click', () => incomeModal.classList.add('hidden'));
+      document.getElementById('btnCancelIncome').addEventListener('click', () => incomeModal.classList.add('hidden'));
+
+      document.getElementById('expenseForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const monthData = getActiveMonthData();
+        const id = document.getElementById('expenseId').value;
+        const name = document.getElementById('expenseName').value;
+        const amount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+        const dueDate = document.getElementById('expenseDueDate').value;
+        const category = document.getElementById('expenseCategory').value;
+        const status = document.getElementById('expenseStatus').value;
+        const isRecurring = document.getElementById('expenseRecurring').checked;
+
+        if (id) {
+          const idx = monthData.expenses.findIndex(x => x.id === id);
+          if (idx !== -1) monthData.expenses[idx] = { id, name, amount, dueDate, category, status, isRecurring };
+          showToast("Despesa atualizada!", "info");
+        } else {
+          monthData.expenses.push({ id: 'exp-' + Date.now(), name, amount, dueDate, category, status, isRecurring });
+          showToast("Despesa cadastrada!", "success");
+        }
+        saveDataToFirebase();
+        expenseModal.classList.add('hidden');
+      });
+
+      document.getElementById('incomeForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const monthData = getActiveMonthData();
+        const id = document.getElementById('incomeId').value;
+        const name = document.getElementById('incomeName').value;
+        const amount = parseFloat(document.getElementById('incomeAmount').value) || 0;
+        const date = document.getElementById('incomeDate').value;
+        const status = document.getElementById('incomeStatus').value;
+
+        if (id) {
+          const idx = monthData.incomes.findIndex(x => x.id === id);
+          if (idx !== -1) monthData.incomes[idx] = { id, name, amount, date, status };
+          showToast("Renda atualizada!", "info");
+        } else {
+          monthData.incomes.push({ id: 'inc-' + Date.now(), name, amount, date, status });
+          showToast("Renda cadastrada!", "success");
+        }
+        saveDataToFirebase();
+        incomeModal.classList.add('hidden');
+      });
+    }
+
+    function openExpenseModal(exp = null) {
+      const modal = document.getElementById('expenseModal');
+      if (exp) {
+        document.getElementById('expenseModalTitle').textContent = 'Editar Despesa';
+        document.getElementById('expenseId').value = exp.id;
+        document.getElementById('expenseName').value = exp.name;
+        document.getElementById('expenseAmount').value = exp.amount;
+        document.getElementById('expenseDueDate').value = exp.dueDate;
+        document.getElementById('expenseCategory').value = exp.category;
+        document.getElementById('expenseStatus').value = exp.status;
+        document.getElementById('expenseRecurring').checked = !!exp.isRecurring;
+      } else {
+        document.getElementById('expenseModalTitle').textContent = 'Adicionar Despesa';
+        document.getElementById('expenseForm').reset();
+        document.getElementById('expenseId').value = '';
+        document.getElementById('expenseDueDate').value = window.currentMonthKey + '-15';
+        document.getElementById('expenseRecurring').checked = false;
+      }
+      modal.classList.remove('hidden');
+    }
+
+    function openIncomeModal(inc = null) {
+      const modal = document.getElementById('incomeModal');
+      if (inc) {
+        document.getElementById('incomeModalTitle').textContent = 'Editar Renda';
+        document.getElementById('incomeId').value = inc.id;
+        document.getElementById('incomeName').value = inc.name;
+        document.getElementById('incomeAmount').value = inc.amount;
+        document.getElementById('incomeDate').value = inc.date;
+        document.getElementById('incomeStatus').value = inc.status;
+      } else {
+        document.getElementById('incomeModalTitle').textContent = 'Adicionar Renda';
+        document.getElementById('incomeForm').reset();
+        document.getElementById('incomeId').value = '';
+        document.getElementById('incomeDate').value = window.currentMonthKey + '-15';
+      }
+      modal.classList.remove('hidden');
+    }
+
+    window.toggleExpenseStatus = function(id) {
+      const mData = getActiveMonthData();
+      const exp = mData.expenses.find(x => x.id === id);
+      if (exp) {
+        exp.status = exp.status === 'PAID' ? 'PENDING' : 'PAID';
+        saveDataToFirebase();
+        showToast("Status alterado", "info");
+      }
+    };
+
+    window.editExpense = function(id) {
+      const exp = getActiveMonthData().expenses.find(x => x.id === id);
+      if (exp) openExpenseModal(exp);
+    };
+
+    window.deleteExpense = async function(id) {
+      if (await customConfirm("Deseja remover esta despesa?")) {
+        const mData = getActiveMonthData();
+        mData.expenses = mData.expenses.filter(x => x.id !== id);
+        saveDataToFirebase();
+        showToast("Removido", "danger");
+      }
+    };
+
+    window.toggleIncomeStatus = function(id) {
+      const mData = getActiveMonthData();
+      const inc = mData.incomes.find(x => x.id === id);
+      if (inc) {
+        inc.status = inc.status === 'RECEIVED' ? 'PENDING' : 'RECEIVED';
+        saveDataToFirebase();
+        showToast("Status alterado", "info");
+      }
+    };
+
+    window.editIncome = function(id) {
+      const inc = getActiveMonthData().incomes.find(x => x.id === id);
+      if (inc) openIncomeModal(inc);
+    };
+
+    window.deleteIncome = async function(id) {
+      if (await customConfirm("Deseja remover esta renda?")) {
+        const mData = getActiveMonthData();
+        mData.incomes = mData.incomes.filter(x => x.id !== id);
+        saveDataToFirebase();
+        showToast("Removido", "danger");
+      }
+    };
+
+    function renderCharts() {
+      const mData = getActiveMonthData();
+      const categories = ['Moradia', 'Contas Casa', 'Cartão de Crédito', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Outros'];
+      const categoryTotals = categories.map(cat => mData.expenses.filter(e => e.category === cat).reduce((sum, e) => sum + Number(e.amount), 0));
+
+      const ctxCat = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChartInstance) categoryChartInstance.destroy();
+      categoryChartInstance = new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+          labels: categories,
+          datasets: [{ data: categoryTotals, backgroundColor: ['#6366f1', '#38bdf8', '#f43f5e', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#64748b'], borderWidth: 0 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 } } } } }
+      });
+
+      const totalIncome = mData.incomes.reduce((acc, i) => acc + Number(i.amount), 0) + mData.initialBalance;
+      const totalExpense = mData.expenses.reduce((acc, e) => acc + Number(e.amount), 0);
+
+      const ctxSum = document.getElementById('summaryChart').getContext('2d');
+      if (summaryChartInstance) summaryChartInstance.destroy();
+      summaryChartInstance = new Chart(ctxSum, {
+        type: 'bar',
+        data: {
+          labels: ['Entradas', 'Despesas'],
+          datasets: [{ data: [totalIncome, totalExpense], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 8 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }, x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
